@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Vector Lighting Edge Detector"
+abstract: "Библиотека для выделения границ на цветных изображениях методом векторного освещения. Содержит классические методы (Sobel, Prewitt, Canny) и авторский метод vector_lighting."
+authors:
+  - family-names: "Панченко"
+    given-names: "Александр Алексеевич"
+    email: "sascha.panchenko2018@yandex.ru"
+    orcid: "https://orcid.org/0009-0009-9104-1214"
+version: "1.0.0"
+date-released: 2026-01-01 
+url: "https://github.com/Nervni-Sanya/Edge-detection-benchmark"
+repository-code: "https://github.com/Nervni-Sanya/Edge-detection-benchmark"
+license: "MIT"
+keywords:
+  - "edge detection"
+  - "image processing"
+  - "vector lighting"
+  - "computer vision"
+  - "Python"
+type: software
