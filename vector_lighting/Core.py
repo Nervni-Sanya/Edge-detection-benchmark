@@ -93,7 +93,7 @@ def canny(image: np.ndarray, low_threshold: float = 50, high_threshold: float = 
         low_threshold: Нижний порог гистерезиса.
         high_threshold: Верхний порог гистерезиса.
         sigma: Параметр Гауссова размытия.
-    
+
     Returns:
         Бинарная карта границ (uint8).
     """
