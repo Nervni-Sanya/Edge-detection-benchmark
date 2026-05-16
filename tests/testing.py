@@ -22,9 +22,14 @@ from tqdm.auto import tqdm
 try:
     from vector_lighting import EdgeDetector, vector_lighting
 except ImportError:
-    print("❌ Ошибка: библиотека vector_lighting не найдена.")
-    print("Установите её командой: pip install -e .")
-    sys.exit(1)
+    # Позволяет запускать скрипт прямо из репозитория без pip install -e .
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    try:
+        from vector_lighting import EdgeDetector, vector_lighting
+    except ImportError:
+        print("❌ Ошибка: библиотека vector_lighting не найдена.")
+        print("Установите её командой: pip install -e .")
+        sys.exit(1)
 
 warnings.filterwarnings('ignore')
 
@@ -183,6 +188,57 @@ def load_real_images() -> Dict[str, dict]:
     return images
 
 ###############################################################################
+#                       БАЗОВОЕ СРАВНЕНИЕ КЛАССИКИ                            #
+###############################################################################
+
+def run_classical_baseline(images: Dict[str, np.ndarray],
+                           ground_truths: Dict[str, Optional[np.ndarray]],
+                           tolerance: int = 2) -> pd.DataFrame:
+    """Прогоняет Sobel/Prewitt/Canny + дефолтный vector_lighting на синтетике
+    и возвращает таблицу F1, как в README."""
+    detectors = {
+        'Sobel':       lambda img: EdgeDetector.sobel(img),
+        'Prewitt':     lambda img: EdgeDetector.prewitt(img),
+        'Canny':       lambda img: EdgeDetector.canny(img),
+        'VectorLight': lambda img: EdgeDetector.vector_lighting(img),
+    }
+    rows = []
+    for img_name, img in images.items():
+        gt = ground_truths.get(img_name)
+        if gt is None:
+            continue
+        row = {'image': img_name}
+        for det_name, det_fn in detectors.items():
+            try:
+                t0 = time.time()
+                result = det_fn(img)
+                elapsed_ms = (time.time() - t0) * 1000
+                # Sobel/Prewitt возвращают серую карту — бинаризуем порогом
+                # как это обычно делается в задаче выделения границ.
+                if det_name in ('Sobel', 'Prewitt'):
+                    result = (result > np.percentile(result, 95)).astype(np.uint8) * 255
+                m = compute_metrics(result, gt, tolerance=tolerance)
+                row[f'{det_name}_F1'] = round(m['f1'], 3)
+                row[f'{det_name}_ms'] = round(elapsed_ms, 1)
+            except Exception as e:
+                print(f"❌ {det_name} on {img_name}: {e}")
+                row[f'{det_name}_F1'] = None
+                row[f'{det_name}_ms'] = None
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    # Печатаем таблицу в стиле README
+    print("\n📊 Базовое сравнение детекторов (F1 @ tolerance=2 px)")
+    f1_cols = [c for c in df.columns if c.endswith('_F1')]
+    print(df[['image'] + f1_cols].to_string(index=False))
+    print("\nСреднее F1 по изображениям:")
+    for c in f1_cols:
+        vals = df[c].dropna()
+        if len(vals):
+            print(f"  {c.replace('_F1','')}: {vals.mean():.3f}")
+    return df
+
+
+###############################################################################
 #                              БЕНЧМАРК                                       #
 ###############################################################################
 
@@ -211,7 +267,7 @@ def run_full_sweep(images: Dict[str, np.ndarray], ground_truths: Dict[str, Optio
                 continue
             try:
                 t0 = time.time()
-                result = EdgeDetector.custom(img, **cfg, binary=True, return_debug=False)
+                result = EdgeDetector.vector_lighting(img, **cfg, binary=True, return_debug=False)
                 elapsed_ms = (time.time() - t0) * 1000
                 metrics = compute_metrics(result, gt, tolerance=2)
                 results.append({
@@ -277,6 +333,14 @@ if __name__ == "__main__":
     images = {k: v['image'] for k, v in all_data.items()}
     ground_truths = {k: v['gt'] for k, v in all_data.items()}
     print(f"\n📊 Итого: {len(images)} изображений, {sum(1 for gt in ground_truths.values() if gt is not None)} с GT")
-    df_results = run_full_sweep(images, ground_truths)
-    analyze_and_export(df_results)
+
+    # Сначала быстрое сравнение классических детекторов — секунды.
+    run_classical_baseline(images, ground_truths)
+
+    # Затем полный перебор параметров vector_lighting — может занять часы.
+    if '--baseline-only' in sys.argv:
+        print("\n⏭️  --baseline-only задан, полный перебор пропущен.")
+    else:
+        df_results = run_full_sweep(images, ground_truths)
+        analyze_and_export(df_results)
     print("\n🎉 Бенчмарк завершён!")
