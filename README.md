@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-orange.svg)]()
 [![DOI](https://zenodo.org/badge/1201389926.svg)](https://doi.org/10.5281/zenodo.19420796)
-[![ru](https://img.shields.io/badge/lang-ru-green.svg)](README.md.ru)
+[![ru](https://img.shields.io/badge/lang-ru-green.svg)](README.ru.md)
 
 A library for edge detection in images. It includes classical methods (Sobel, Prewitt, Canny) and an **original vector lighting method**, designed for effective edge detection on color images.
 
