@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-orange.svg)]()
 [![DOI](https://zenodo.org/badge/1201389926.svg)](https://doi.org/10.5281/zenodo.19420796)
+[![en](https://img.shields.io/badge/lang-en-blue.svg)](README.md)
 
 Библиотека для выделения границ на изображениях. Содержит классические методы (Sobel, Prewitt, Canny) и **авторский метод векторного освещения**, разработанный для эффективной детекции границ на цветных изображениях.
 
