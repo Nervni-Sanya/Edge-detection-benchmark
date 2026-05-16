@@ -26,9 +26,9 @@ def _normalize_image(image: np.ndarray, target_range: Tuple[float, float] = (0, 
 
 
 def _rgb_to_grayscale(image: np.ndarray) -> np.ndarray:
-    if len(image.shape) == 3:
-        return np.dot(image[..., :3], [0.2989, 0.5870, 0.1140]).astype(np.uint8)
-    return image
+    if image.ndim == 3:
+        return np.dot(image[..., :3], [0.2989, 0.5870, 0.1140])
+    return image.astype(float)
 
 
 ###############################################################################
@@ -48,8 +48,8 @@ def sobel(image: np.ndarray) -> np.ndarray:
     gray = _rgb_to_grayscale(image)
     sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=float)
     sobel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=float)
-    gx = correlate2d(gray.astype(float), sobel_x, mode='same', boundary='symm')
-    gy = correlate2d(gray.astype(float), sobel_y, mode='same', boundary='symm')
+    gx = correlate2d(gray, sobel_x, mode='same', boundary='symm')
+    gy = correlate2d(gray, sobel_y, mode='same', boundary='symm')
     magnitude = np.sqrt(gx**2 + gy**2)
     if magnitude.max() > 0:
         magnitude = _normalize_image(magnitude, (0, 255))
@@ -72,8 +72,8 @@ def prewitt(image: np.ndarray) -> np.ndarray:
     gray = _rgb_to_grayscale(image)
     prewitt_x = np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]], dtype=float)
     prewitt_y = np.array([[-1, -1, -1], [0, 0, 0], [1, 1, 1]], dtype=float)
-    gx = correlate2d(gray.astype(float), prewitt_x, mode='same', boundary='symm')
-    gy = correlate2d(gray.astype(float), prewitt_y, mode='same', boundary='symm')
+    gx = correlate2d(gray, prewitt_x, mode='same', boundary='symm')
+    gy = correlate2d(gray, prewitt_y, mode='same', boundary='symm')
     magnitude = np.sqrt(gx**2 + gy**2)
     if magnitude.max() > 0:
         magnitude = _normalize_image(magnitude, (0, 255))
@@ -98,7 +98,7 @@ def canny(image: np.ndarray, low_threshold: float = 50, high_threshold: float = 
         Бинарная карта границ (uint8).
     """
     gray = _rgb_to_grayscale(image)
-    smoothed = gaussian_filter(gray.astype(float), sigma=sigma)
+    smoothed = gaussian_filter(gray, sigma=sigma)
     
     sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=float)
     sobel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=float)
@@ -116,19 +116,22 @@ def canny(image: np.ndarray, low_threshold: float = 50, high_threshold: float = 
     mask_v = (angle >= 67.5) & (angle < 112.5)
     mask_d2 = (angle >= 112.5) & (angle < 157.5)
     
-    mag_up = np.roll(magnitude, -1, axis=0)
-    mag_down = np.roll(magnitude, 1, axis=0)
-    mag_left = np.roll(magnitude, -1, axis=1)
-    mag_right = np.roll(magnitude, 1, axis=1)
-    mag_ul = np.roll(np.roll(magnitude, -1, axis=0), -1, axis=1)
-    mag_ur = np.roll(np.roll(magnitude, -1, axis=0), 1, axis=1)
-    mag_dl = np.roll(np.roll(magnitude, 1, axis=0), -1, axis=1)
-    mag_dr = np.roll(np.roll(magnitude, 1, axis=0), 1, axis=1)
-    
-    suppressed[mask_h] = magnitude[mask_h] * ((magnitude[mask_h] >= mag_left[mask_h]) & (magnitude[mask_h] >= mag_right[mask_h]))
-    suppressed[mask_d1] = magnitude[mask_d1] * ((magnitude[mask_d1] >= mag_ul[mask_d1]) & (magnitude[mask_d1] >= mag_dr[mask_d1]))
-    suppressed[mask_v] = magnitude[mask_v] * ((magnitude[mask_v] >= mag_up[mask_v]) & (magnitude[mask_v] >= mag_down[mask_v]))
-    suppressed[mask_d2] = magnitude[mask_d2] * ((magnitude[mask_d2] >= mag_ur[mask_d2]) & (magnitude[mask_d2] >= mag_dl[mask_d2]))
+    # np.roll(arr, -1, axis=k) puts the value at index k+1 into index k, so each
+    # name below is the neighbor whose value the array holds at position (i, j).
+    mag_below = np.roll(magnitude, -1, axis=0)   # holds magnitude[i+1, j]
+    mag_above = np.roll(magnitude,  1, axis=0)   # holds magnitude[i-1, j]
+    mag_right = np.roll(magnitude, -1, axis=1)   # holds magnitude[i, j+1]
+    mag_left  = np.roll(magnitude,  1, axis=1)   # holds magnitude[i, j-1]
+    mag_br = np.roll(np.roll(magnitude, -1, axis=0), -1, axis=1)  # [i+1, j+1]
+    mag_bl = np.roll(np.roll(magnitude, -1, axis=0),  1, axis=1)  # [i+1, j-1]
+    mag_tr = np.roll(np.roll(magnitude,  1, axis=0), -1, axis=1)  # [i-1, j+1]
+    mag_tl = np.roll(np.roll(magnitude,  1, axis=0),  1, axis=1)  # [i-1, j-1]
+
+    suppressed[mask_h]  = magnitude[mask_h]  * ((magnitude[mask_h]  >= mag_left[mask_h])  & (magnitude[mask_h]  >= mag_right[mask_h]))
+    suppressed[mask_d1] = magnitude[mask_d1] * ((magnitude[mask_d1] >= mag_br[mask_d1])   & (magnitude[mask_d1] >= mag_tl[mask_d1]))
+    suppressed[mask_v]  = magnitude[mask_v]  * ((magnitude[mask_v]  >= mag_above[mask_v]) & (magnitude[mask_v]  >= mag_below[mask_v]))
+    suppressed[mask_d2] = magnitude[mask_d2] * ((magnitude[mask_d2] >= mag_bl[mask_d2])   & (magnitude[mask_d2] >= mag_tr[mask_d2]))
+    # Zero the border rows/cols where np.roll wrapped around.
     suppressed[0, :] = suppressed[-1, :] = suppressed[:, 0] = suppressed[:, -1] = 0
     
     # Hysteresis thresholding
@@ -136,7 +139,7 @@ def canny(image: np.ndarray, low_threshold: float = 50, high_threshold: float = 
     weak = (suppressed >= low_threshold) & (suppressed < high_threshold)
     edges = strong.copy()
     
-    for _ in range(100):
+    while True:
         dilated = binary_dilation(edges, structure=np.ones((3, 3)))
         new_edges = dilated & weak & ~edges
         if not np.any(new_edges):
@@ -188,14 +191,15 @@ def _calculate_global_threshold(channels: List[np.ndarray],
 
 def _vector_lighting_vectorized(channel_x: np.ndarray, channel_y: np.ndarray, channel_z: np.ndarray,
                                light_vectors: List[Tuple[float, float]], threshold: float, height_weight: float = 1.0) -> np.ndarray:
-    grad_x_x, grad_x_y = np.gradient(channel_x.astype(float))
-    grad_y_x, grad_y_y = np.gradient(channel_y.astype(float))
+    # np.gradient returns (d/d_axis0, d/d_axis1) — row-direction then col-direction.
+    gx_row, gx_col = np.gradient(channel_x.astype(float))
+    gy_row, gy_col = np.gradient(channel_y.astype(float))
     height_factor = 1.0 + height_weight * (channel_z - threshold) / 255.0
     height_factor = np.clip(height_factor, 0.1, 3.0)
     accumulated = np.zeros_like(channel_x, dtype=float)
     for dx, dy in light_vectors:
-        resp_x = grad_x_x * dx + grad_x_y * dy
-        resp_y = grad_y_x * dx + grad_y_y * dy
+        resp_x = gx_row * dx + gx_col * dy
+        resp_y = gy_row * dx + gy_col * dy
         combined = np.sqrt(resp_x**2 + resp_y**2)
         accumulated += combined * height_factor
     accumulated /= len(light_vectors)
