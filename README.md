@@ -20,7 +20,7 @@ Radiophysicist, student
 ## ✨ Features
 
 - **Color sensitivity** – the `vector_lighting` method detects **isoluminant edges** (transitions between different colors of equal brightness), which are invisible to classical methods.
-- **Competitive quality** – average F1-score 0.788 (comparable to Canny, but on color tests it outperforms by 88–210%).
+- **Competitive quality** – mean F1-score **0.788** on the 20,736-configuration synthetic parameter sweep and **0.740** on the 6-image benchmark below (comparable to Canny; on color tests it outperforms by 88–210%).
 - **Performance** – vectorized implementation on NumPy/SciPy. **Faster than Canny** with comparable quality.
 - **Scientifically grounded**: parameters optimized based on a brute‑force search of **20,736 configurations**.
 - **Flexibility** – configurable lighting modes, channel permutations, fusion methods.
@@ -100,7 +100,7 @@ edges = vector_lighting(
     clean_noise=False      # Preserve fine edges
 )
 ```
-Result: Mean F1 = 0.788 on synthetic tests.
+Result: Mean F1 = **0.788** on the 20,736-configuration synthetic parameter sweep (vs **0.740** on the 6-image benchmark above).
 
 ### For high speed
 
