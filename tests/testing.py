@@ -239,6 +239,104 @@ def run_classical_baseline(images: Dict[str, np.ndarray],
 
 
 ###############################################################################
+#                       СРАВНЕНИЕ ПО СКОРОСТИ                                 #
+###############################################################################
+
+# Пресеты vector_lighting: от точного (медленно) к быстрому.
+VL_PRESETS = {
+    'VL-default': dict(mode=3, sigma=1.0, binary_percentile=0.05, use_permutations=True,
+                       merge_method='max', threshold_method='percentile',
+                       threshold_factor=0.25, height_weight=1.0, clean_noise=False),
+    'VL-balanced': dict(mode=1, sigma=1.0, binary_percentile=0.05, use_permutations=True,
+                        merge_method='max', threshold_method='percentile',
+                        threshold_factor=0.25, height_weight=1.0, clean_noise=False),
+    'VL-fast': dict(mode=1, sigma=0.5, binary_percentile=0.05, use_permutations=False,
+                    merge_method='max', threshold_method='mean_std',
+                    threshold_factor=0.25, height_weight=1.0, clean_noise=False),
+    'VL-turbo': dict(mode=1, sigma=0.0, binary_percentile=0.0, use_permutations=False,
+                     merge_method='max', threshold_method='percentile',
+                     threshold_factor=0.25, height_weight=1.0, clean_noise=False),
+}
+
+
+def _time_call(fn, img, warmup: int = 3, reps: int = 15) -> float:
+    """Возвращает медианное время одного вызова fn(img) в миллисекундах.
+    perf_counter имеет субмикросекундное разрешение (в отличие от time.time()
+    на Windows, у которого шаг ~15 мс — отсюда и нули в старом отчёте)."""
+    for _ in range(warmup):
+        fn(img)
+    samples = []
+    for _ in range(reps):
+        t0 = time.perf_counter()
+        fn(img)
+        samples.append((time.perf_counter() - t0) * 1000.0)
+    return float(np.median(samples))
+
+
+def run_timing_comparison(images: Dict[str, np.ndarray],
+                          ground_truths: Dict[str, Optional[np.ndarray]],
+                          tolerance: int = 2,
+                          warmup: int = 3, reps: int = 15) -> pd.DataFrame:
+    """Надёжно измеряет F1 и время для классических детекторов и пресетов
+    vector_lighting. Время — медиана из `reps` прогонов после `warmup`,
+    усреднённая по изображениям. Возвращает таблицу для отчёта."""
+    def _sobel_binary(img):
+        g = EdgeDetector.sobel(img)
+        return (g > np.percentile(g, 95)).astype(np.uint8) * 255
+
+    def _prewitt_binary(img):
+        g = EdgeDetector.prewitt(img)
+        return (g > np.percentile(g, 95)).astype(np.uint8) * 255
+
+    detectors = {
+        'Sobel':   _sobel_binary,
+        'Prewitt': _prewitt_binary,
+        'Canny':   lambda img: EdgeDetector.canny(img),
+    }
+    for name, cfg in VL_PRESETS.items():
+        detectors[name] = (lambda c: (lambda img: EdgeDetector.vector_lighting(img, **c)))(cfg)
+
+    # Для замера времени берём только изображения с GT (синтетика, 256x256).
+    timed_images = {k: v for k, v in images.items() if ground_truths.get(k) is not None}
+
+    per_det = []
+    for det_name, det_fn in detectors.items():
+        f1s, times = [], []
+        for img_name, img in timed_images.items():
+            gt = ground_truths[img_name]
+            try:
+                result = det_fn(img)
+                f1s.append(compute_metrics(result, gt, tolerance=tolerance)['f1'])
+                times.append(_time_call(det_fn, img, warmup, reps))
+            except Exception as e:
+                print(f"❌ {det_name} on {img_name}: {e}")
+        if not times:
+            continue
+        per_det.append({
+            'detector': det_name,
+            'mean_f1': round(float(np.mean(f1s)), 3),
+            'median_ms': round(float(np.median(times)), 3),
+            'mean_ms': round(float(np.mean(times)), 3),
+        })
+
+    df = pd.DataFrame(per_det)
+    # Относительная скорость к Canny (как в README).
+    canny_ms = df.loc[df['detector'] == 'Canny', 'median_ms']
+    if len(canny_ms) and canny_ms.iloc[0] > 0:
+        base = canny_ms.iloc[0]
+        df['speed_vs_canny'] = (base / df['median_ms']).round(2)
+    print(f"\n⏱️  Сравнение по скорости (медиана из {reps} прогонов, {len(timed_images)} изобр., 256x256)")
+    print(df.to_string(index=False))
+    print("\nЧитать так: speed_vs_canny=2.0 → вдвое быстрее Canny.")
+    try:
+        df.to_csv('timing_comparison.csv', index=False)
+        print("📁 Таблица скорости сохранена в timing_comparison.csv")
+    except Exception as e:
+        print(f"⚠️  Не удалось сохранить timing_comparison.csv: {e}")
+    return df
+
+
+###############################################################################
 #                              БЕНЧМАРК                                       #
 ###############################################################################
 
@@ -266,9 +364,9 @@ def run_full_sweep(images: Dict[str, np.ndarray], ground_truths: Dict[str, Optio
             if gt is None:
                 continue
             try:
-                t0 = time.time()
+                t0 = time.perf_counter()
                 result = EdgeDetector.vector_lighting(img, **cfg, binary=True, return_debug=False)
-                elapsed_ms = (time.time() - t0) * 1000
+                elapsed_ms = (time.perf_counter() - t0) * 1000
                 metrics = compute_metrics(result, gt, tolerance=2)
                 results.append({
                     'image': img_name,
@@ -296,7 +394,8 @@ def analyze_and_export(df: pd.DataFrame, output_file: str = 'sweep_results.xlsx'
         mean_time_ms=('time_ms', 'mean'),
         min_f1=('f1', 'min')
     ).reset_index()
-    summary['efficiency'] = summary['mean_f1'] / np.log1p(summary['mean_time_ms'])
+    # Защита от деления на ~0 для очень быстрых конфигураций.
+    summary['efficiency'] = summary['mean_f1'] / np.log1p(np.maximum(summary['mean_time_ms'], 0.05))
     summary = summary.sort_values('mean_f1', ascending=False)
     try:
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -336,6 +435,9 @@ if __name__ == "__main__":
 
     # Сначала быстрое сравнение классических детекторов — секунды.
     run_classical_baseline(images, ground_truths)
+
+    # Затем надёжный замер скорости (perf_counter + прогрев + повторы).
+    run_timing_comparison(images, ground_truths)
 
     # Затем полный перебор параметров vector_lighting — может занять часы.
     if '--baseline-only' in sys.argv:
