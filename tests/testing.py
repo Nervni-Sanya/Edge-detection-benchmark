@@ -31,6 +31,10 @@ except ImportError:
         print("Установите её командой: pip install -e .")
         sys.exit(1)
 
+# Цветовые baseline'ы (Di Zenzo и др.) — честное сравнение для цветового метода.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from color_baselines import dizenzo, dizenzo_canny, multichannel_sobel  # noqa: E402
+
 warnings.filterwarnings('ignore')
 
 ###############################################################################
@@ -200,6 +204,8 @@ def run_classical_baseline(images: Dict[str, np.ndarray],
         'Sobel':       lambda img: EdgeDetector.sobel(img),
         'Prewitt':     lambda img: EdgeDetector.prewitt(img),
         'Canny':       lambda img: EdgeDetector.canny(img),
+        'DiZenzo':     lambda img: dizenzo(img),
+        'DiZenzoCanny': lambda img: dizenzo_canny(img),
         'VectorLight': lambda img: EdgeDetector.vector_lighting(img),
     }
     rows = []
@@ -422,6 +428,8 @@ def run_orientation_test(tolerance: int = 2,
     detectors['VL-default'] = lambda img: EdgeDetector.vector_lighting(img, **VL_PRESETS['VL-default'])
     detectors['Sobel'] = _sobel_binary
     detectors['Canny'] = lambda img: EdgeDetector.canny(img)
+    detectors['DiZenzo'] = lambda img: dizenzo(img)
+    detectors['DiZenzoCanny'] = lambda img: dizenzo_canny(img)
 
     rows = []
     for name, item in data.items():
@@ -433,8 +441,8 @@ def run_orientation_test(tolerance: int = 2,
 
     for kind, label in (('lum', 'яркостные полосы'), ('iso', 'изолюминантные полосы')):
         pivot = df[df['kind'] == kind].pivot(index='angle', columns='detector', values='f1')
-        pivot = pivot[[c for c in ['VL-mode0', 'VL-mode1', 'VL-mode2', 'VL-mode3',
-                                   'VL-default', 'Sobel', 'Canny'] if c in pivot.columns]]
+        pivot = pivot[[c for c in ['VL-mode1', 'VL-mode3', 'VL-default',
+                                   'DiZenzo', 'DiZenzoCanny', 'Sobel', 'Canny'] if c in pivot.columns]]
         print(f"\n🧭 F1 по углу нормали полос — {label} (допуск {tolerance} px)")
         print(pivot.to_string())
 
@@ -634,6 +642,8 @@ def run_bsds_eval(root: str, split: str = 'test', limit: Optional[int] = None,
 
     detectors = {'Sobel': _sobel_binary, 'Prewitt': _prewitt_binary,
                  'Canny': lambda img: EdgeDetector.canny(img),
+                 'DiZenzo': lambda img: dizenzo(img),
+                 'DiZenzoCanny': lambda img: dizenzo_canny(img),
                  'VL-default': lambda img: EdgeDetector.vector_lighting(img, **VL_PRESETS['VL-default']),
                  'VL-fast': lambda img: EdgeDetector.vector_lighting(img, **VL_PRESETS['VL-fast'])}
 
