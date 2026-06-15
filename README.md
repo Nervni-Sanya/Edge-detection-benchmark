@@ -15,7 +15,7 @@ A small, reproducible edge-detection benchmark. It implements classical grayscal
 > - Its one distinctive ingredient, a channel-asymmetric *height* term, perturbs the result by only ~2–3% and **does not improve** general-RGB accuracy (on BSDS500 it slightly lowers it).
 > - The genuine "color sensitivity" advantage over grayscale Canny is **real but not unique** — Di Zenzo shares it.
 >
-> So `vector_lighting` is **not** a superior new detector. This repository is therefore best understood as a **benchmark and an independent re-derivation**, not a novelty claim. See [`docs/benchmark_report_2026-06.md`](docs/benchmark_report_2026-06.md) and reproduce the equivalence with `python tests/correspondence_analysis.py`.
+> So `vector_lighting` is **not** a superior new detector. This repository is therefore best understood as a **benchmark and an independent re-derivation**, not a novelty claim. The algebraic proof of equivalence is in [`docs/equivalence.md`](docs/equivalence.md); empirical verification is reproducible with `python tests/correspondence_analysis.py`; the extended benchmark report is in [`docs/benchmark_report_2026-06.md`](docs/benchmark_report_2026-06.md).
 
 ## Author
 
