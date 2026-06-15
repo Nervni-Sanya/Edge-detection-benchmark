@@ -11,7 +11,6 @@ setup(
     name="vector-lighting-edges",
     version="1.0.0",
     author="Панченко Александр Алексеевич",
-    author_email="sascha.panchenko2018@yandex.ru", 
     description="Edge detection using vector lighting method for RGB images",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -20,7 +19,6 @@ setup(
         "Bug Tracker": "https://github.com/Nervni-Sanya/Edge-detection-benchmark/issues",
         "Source Code": "https://github.com/Nervni-Sanya/Edge-detection-benchmark",
         "Documentation": "https://github.com/Nervni-Sanya/Edge-detection-benchmark#readme",
-        "Author Profile": "https://orcid.org/0009-0009-9104-1214", 
     },
     packages=find_packages(),
     classifiers=[

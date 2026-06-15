@@ -19,7 +19,7 @@
 ## Автор
 
 **Панченко Александр Алексеевич** — радиофизик, студент  
-[Email](mailto:sascha.panchenko2018@yandex.ru) · [GitHub](https://github.com/Nervni-Sanya) · [ORCID](https://orcid.org/0009-0009-9104-1214)
+[GitHub](https://github.com/Nervni-Sanya)
 
 ## Что внутри
 

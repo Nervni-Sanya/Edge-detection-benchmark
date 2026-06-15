@@ -5,8 +5,6 @@ abstract: "Библиотека для выделения границ на цв
 authors:
   - family-names: "Панченко"
     given-names: "Александр Алексеевич"
-    email: "sascha.panchenko2018@yandex.ru"
-    orcid: "https://orcid.org/0009-0009-9104-1214"
 version: "1.0.0"
 date-released: 2026-05-04 
 url: "https://github.com/Nervni-Sanya/Edge-detection-benchmark"
