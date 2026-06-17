@@ -7,7 +7,7 @@
 [![DOI](https://zenodo.org/badge/1201389926.svg)](https://doi.org/10.5281/zenodo.19420796)
 [![ru](https://img.shields.io/badge/lang-ru-green.svg)](README.ru.md)
 
-A small, reproducible edge-detection benchmark. It implements classical grayscale operators (Sobel, Prewitt, Canny), color operators (the Di Zenzo color structure tensor and variants), and `vector_lighting` — a method derived here from a "virtual illumination" model of the RGB channels.
+A small Python edge-detection toolkit and reproducible benchmark. The package ships **seven** edge detectors usable out of the box from a single API: classical grayscale operators (**Sobel**, **Prewitt**, **Canny**), color operators (the **Di Zenzo** color structure tensor, a Di-Zenzo-based **color Canny**, **multichannel Sobel**), and **`vector_lighting`** — a method derived here from a "virtual illumination" model of the RGB channels.
 
 > ### ⚠️ Honest status of the `vector_lighting` method
 > This project began as an attempt at an original color edge detector. A rigorous comparison against the proper **color** baseline — the **Di Zenzo (1986) structure tensor** — showed that:
@@ -84,14 +84,30 @@ On real photos Di Zenzo slightly leads `vector_lighting` (0.565 vs 0.552). All h
 
 ## Library usage
 
-```python
-from vector_lighting import sobel, prewitt, canny, vector_lighting, EdgeDetector
+All seven detectors share a simple `(H, W, 3) uint8 → (H, W) uint8` signature:
 
-edges = vector_lighting(image)            # color edge map (uint8)
-edges = canny(image, low_threshold=50, high_threshold=100)
+```python
+import numpy as np
+from vector_lighting import sobel, prewitt, canny, vector_lighting   # grayscale + VL
+from tests.color_baselines import dizenzo, dizenzo_canny, multichannel_sobel  # color
+
+img = np.asarray(some_PIL_image)  # (H, W, 3) uint8
+
+# Grayscale operators
+e_sobel   = sobel(img)
+e_prewitt = prewitt(img)
+e_canny   = canny(img, low_threshold=50, high_threshold=100)
+
+# Color operators (see them in tests/color_baselines.py)
+e_dz      = dizenzo(img,        sigma=1.0)
+e_dzc     = dizenzo_canny(img,  sigma=1.0)
+e_mcs     = multichannel_sobel(img, sigma=1.0)
+
+# vector_lighting (parameters documented in vector_lighting/core.py)
+e_vl      = vector_lighting(img, mode=3, sigma=1.0)
 ```
 
-The detectors are usable as a small library; `vector_lighting`'s parameters are documented in [the source](vector_lighting/core.py). For a standard, well-understood color edge detector prefer the Di Zenzo structure tensor (`tests/color_baselines.py`).
+For a standard, well-understood color edge detector, prefer the Di Zenzo structure tensor — it's faster, slightly more accurate on real photos (BSDS500), and the documented baseline in the literature.
 
 ## Reproduce
 

@@ -6,7 +6,7 @@
 [![DOI](https://zenodo.org/badge/1201389926.svg)](https://doi.org/10.5281/zenodo.19420796)
 [![en](https://img.shields.io/badge/lang-en-blue.svg)](README.md)
 
-Небольшой воспроизводимый бенчмарк выделения границ. Реализует классические полутоновые операторы (Sobel, Prewitt, Canny), цветовые операторы (структурный тензор Ди Дзензо и варианты) и `vector_lighting` — метод, выведенный здесь из модели «виртуального освещения» RGB-каналов.
+Небольшой Python-инструментарий для выделения границ и воспроизводимый бенчмарк. В пакете **семь** готовых к использованию детекторов с единым API: классические полутоновые (**Sobel**, **Prewitt**, **Canny**), цветовые (**структурный тензор Ди Дзензо**, **цветной Canny** на его основе, **multichannel Sobel**) и **`vector_lighting`** — метод, выведенный здесь из модели «виртуального освещения» RGB-каналов.
 
 > ### ⚠️ Честный статус метода `vector_lighting`
 > Проект начинался как попытка оригинального цветового детектора границ. Строгое сравнение с правильным **цветовым** эталоном — **структурным тензором Ди Дзензо (1986)** — показало:
@@ -83,14 +83,30 @@
 
 ## Использование как библиотеки
 
-```python
-from vector_lighting import sobel, prewitt, canny, vector_lighting, EdgeDetector
+Все семь детекторов имеют одинаковую сигнатуру `(H, W, 3) uint8 → (H, W) uint8`:
 
-edges = vector_lighting(image)            # цветовая карта границ (uint8)
-edges = canny(image, low_threshold=50, high_threshold=100)
+```python
+import numpy as np
+from vector_lighting import sobel, prewitt, canny, vector_lighting   # полутоновые + VL
+from tests.color_baselines import dizenzo, dizenzo_canny, multichannel_sobel  # цветовые
+
+img = np.asarray(some_PIL_image)  # (H, W, 3) uint8
+
+# Полутоновые операторы
+e_sobel   = sobel(img)
+e_prewitt = prewitt(img)
+e_canny   = canny(img, low_threshold=50, high_threshold=100)
+
+# Цветовые операторы (см. tests/color_baselines.py)
+e_dz      = dizenzo(img,        sigma=1.0)
+e_dzc     = dizenzo_canny(img,  sigma=1.0)
+e_mcs     = multichannel_sobel(img, sigma=1.0)
+
+# vector_lighting (параметры — в vector_lighting/core.py)
+e_vl      = vector_lighting(img, mode=3, sigma=1.0)
 ```
 
-Детекторы пригодны как небольшая библиотека; параметры `vector_lighting` описаны в [исходнике](vector_lighting/core.py). Для стандартного, хорошо изученного цветового детектора предпочтительнее структурный тензор Ди Дзензо (`tests/color_baselines.py`).
+Для стандартного, хорошо изученного цветового детектора предпочтительнее структурный тензор Ди Дзензо — он быстрее, чуть точнее на реальных фото (BSDS500) и описан как baseline в литературе.
 
 ## Воспроизведение
 
