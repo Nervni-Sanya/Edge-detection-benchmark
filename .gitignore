@@ -49,6 +49,7 @@ timing_comparison.csv
 orientation_results.*
 scaling_results.csv
 bsds_results.csv
+rgbd_results.csv
 
 # Documentation
 docs/_build/
