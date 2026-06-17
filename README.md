@@ -67,13 +67,13 @@ Both color methods see isoluminant edges; grayscale Canny cannot. This is the co
 
 | Method | F1 | Precision | Recall |
 |--------|:--:|:---------:|:------:|
-| **DiZenzo** | **0.565** | **0.637** | 0.526 |
+| **DiZenzo** | **0.575** | **0.654** | 0.531 |
 | Canny | 0.566 | 0.482 | 0.774 |
-| VL-default | 0.552 | 0.605 | 0.504 |
+| VL-default | 0.552 | 0.630 | 0.509 |
 | Prewitt | 0.543 | 0.582 | 0.529 |
 | Sobel | 0.541 | 0.577 | 0.530 |
 
-On real photos Di Zenzo slightly leads `vector_lighting` (0.565 vs 0.552). All hand-crafted detectors sit far below modern learned methods (BSDS ODS ≈ 0.83–0.84).
+On real photos Di Zenzo leads `vector_lighting` (0.575 vs 0.552). All hand-crafted detectors sit far below modern learned methods (BSDS ODS ≈ 0.83–0.84).
 
 ### Method equivalence (`tests/correspondence_analysis.py`)
 

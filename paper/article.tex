@@ -1,0 +1,480 @@
+%==============================================================================
+%  A parametric reformulation of the color structure tensor through virtual
+%  illumination: equivalence and the limits of multiplicative extension to RGB-D
+%
+%  DRAFT SKELETON for submission to Pattern Recognition and Image Analysis (PRIA).
+%
+%  NOTE ON FORMAT: this file uses the standard `article` class so it compiles
+%  anywhere with a basic TeX install (no journal class needed). Before
+%  submission, port the body into the PRIA / Pleiades template
+%  (pleiades.cls / spr-pria style). The theorems, equations, and tables below
+%  are final and carry the actual measured numbers from the repository.
+%
+%  Placeholders to be written by the author are marked \todo{...} (red).
+%  Draft prose already in place is plain text and may be edited freely.
+%
+%  Could not compile-test in the authoring environment (no TeX toolchain).
+%  Build locally with:  latexmk -pdf article.tex   (or pdflatex x2).
+%==============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+% --- placeholder helpers -----------------------------------------------------
+\newcommand{\todo}[1]{\textcolor{red}{[\textbf{TODO:} #1]}}
+\newcommand{\note}[1]{\textcolor{blue}{\textit{#1}}}
+
+% --- theorem environments ----------------------------------------------------
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+
+% --- notation shortcuts ------------------------------------------------------
+\newcommand{\Lvec}{\mathbf{L}}
+\newcommand{\grad}{\nabla}
+\newcommand{\lmax}{\lambda_{\max}}
+\newcommand{\lmin}{\lambda_{\min}}
+\newcommand{\Mxy}{M_{XY}}
+\newcommand{\transpose}{^{\mathsf T}}
+
+\title{A Parametric Reformulation of the Color Structure Tensor
+through Virtual Illumination: Equivalence and the Limits of
+Multiplicative Extension to RGB-D}
+
+% TODO: adapt author block to the PRIA template before submission.
+% Per the author's preference, no e-mail / ORCID is embedded here.
+\author{A.\,A.~Panchenko\\
+  \small Ufa University of Science and Technology, Ufa, Russia
+  % \and K.\,F.~Latypov  % TODO: confirm co-authorship / order
+}
+\date{Draft, \today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\note{Draft abstract --- tighten before submission.}
+Color edge detection that is sensitive to isoluminant transitions is
+classically handled by the Di~Zenzo multichannel structure tensor.
+We analyze a recently proposed ``virtual illumination'' edge operator,
+which models the RGB channels as scalar surfaces lit from several virtual
+directions, and show that it is \emph{not} an independent operator: with its
+channel-asymmetric modulation disabled, its angularly-averaged response is a
+strictly monotone function of the largest eigenvalue of the Di~Zenzo tensor,
+so that threshold-binarized edge maps of the two methods coincide
+(Spearman $\rho \approx 0.99$ on natural images, $1.00$ on synthetic edges).
+We then characterize the single algebraically distinct ingredient of the
+method --- a multiplicative height term --- and prove that it is structurally
+unable to detect edges defined by the modulating channel alone, which closes
+the RGB-D direction as a route to improving on the symmetric tensor. The
+contribution is thus an explicit bridge between an intuitive physical model
+and the established tensor formalism, a map of the admissible generalizations,
+and an open, reproducible benchmark.
+\todo{State the one-sentence headline result and quantitative highlights.}
+
+\medskip
+\noindent\textbf{Keywords:} color edge detection, structure tensor, Di~Zenzo
+gradient, isoluminant edges, RGB-D, virtual illumination.
+\end{abstract}
+
+%==============================================================================
+\section{Introduction}
+\label{sec:intro}
+
+\note{Draft --- expand.}
+Edge detection on color images must, in principle, exploit chromatic
+transitions that carry no luminance contrast (\emph{isoluminant} edges),
+which grayscale operators such as Sobel, Prewitt, and Canny cannot see by
+construction. A natural and intuitive way to reason about color gradients is
+to picture each channel as a height surface and to ``illuminate'' it from
+several virtual directions, accumulating the response. This paper studies such
+a virtual-illumination operator and asks a precise question: \emph{is it a new
+operator, or a re-derivation of an existing one?}
+
+\todo{Motivate why the question matters: independent re-derivations are common;
+establishing the exact relationship to prior art (Di~Zenzo) is the scientific
+contribution, and it is non-obvious from the formula.}
+
+\paragraph{Contributions.}
+\begin{itemize}
+  \item A parametric reformulation of the color structure tensor in which the
+        lighting directions, their number, and a channel-asymmetric modulation
+        appear as explicit, separately controllable degrees of freedom
+        (Section~\ref{sec:decomp}).
+  \item An equivalence theorem: with the modulation disabled, the operator
+        reduces to the Di~Zenzo magnitude up to a strictly monotone map, hence
+        to identical threshold-binarized output (Section~\ref{sec:equiv},
+        Theorem~\ref{thm:equiv}).
+  \item A structural-limit theorem for the multiplicative extension, and a
+        resulting map of admissible RGB-D generalizations
+        (Section~\ref{sec:rgbd}, Theorem~\ref{thm:mult}).
+  \item An open, reproducible benchmark (synthetic, orientation, BSDS500,
+        RGB-D) with all code released (Section~\ref{sec:exp}).
+\end{itemize}
+
+%==============================================================================
+\section{Background: the Di~Zenzo structure tensor}
+\label{sec:background}
+
+\note{Draft --- expand with a short literature trace.}
+For a multichannel image with channels $C_k$, Di~Zenzo~\cite{dizenzo1986}
+defines the gradient through the structure tensor
+\begin{equation}
+\label{eq:dz-tensor}
+M \;=\; \sum_{k} (\grad C_k)(\grad C_k)\transpose
+\;=\;
+\begin{pmatrix} E & F \\ F & G \end{pmatrix},
+\quad
+\begin{aligned}
+E &= \textstyle\sum_k (C_{k,x})^2,\\
+F &= \textstyle\sum_k C_{k,x} C_{k,y},\\
+G &= \textstyle\sum_k (C_{k,y})^2,
+\end{aligned}
+\end{equation}
+and takes the edge magnitude as $\sqrt{\lmax(M)}$, where $\lmax \ge \lmin \ge 0$
+are the eigenvalues. The largest eigenvalue captures the maximal directional
+variation across all channels jointly, so chromatic edges with no luminance
+step are detected. \todo{Cite Cumani~\cite{cumani1991}, Sapiro~\cite{sapiro1996},
+the color tensor of van de Weijer et al.~\cite{weijer2006}; note relation to
+the grayscale structure tensor.}
+
+%==============================================================================
+\section{The virtual-illumination operator as a parametric decomposition}
+\label{sec:decomp}
+
+\note{Draft --- this section presents the method as the author's reformulation.}
+Treat the RGB channels as three scalar surfaces. For an ordered channel triple
+$(X,Y,Z)$ and a unit ``illumination'' direction $\Lvec=(d_x,d_y)\transpose$,
+the operator forms the per-direction response
+\begin{equation}
+\label{eq:vl-response}
+E_{\Lvec}
+\;=\;
+\sqrt{(\grad X \cdot \Lvec)^2 + (\grad Y \cdot \Lvec)^2}
+\;\cdot\;
+\underbrace{\Bigl(1 + \alpha\,\tfrac{C_Z - T}{255}\Bigr)}_{h(C_Z)},
+\end{equation}
+where $T$ is a global threshold (the $75$th percentile of the intensity
+distribution) and $\alpha$ controls a channel-asymmetric \emph{height}
+modulation. The response is averaged over a set of $N$ illumination directions
+and, optionally, over the channel permutations, with a maximum fusion. The
+free parameters --- the direction set $\{\Lvec_k\}$, their number $N$, the
+modulation $h$ --- are exactly the degrees of freedom that, as we show next,
+are folded into the single scalar $\lmax$ of the Di~Zenzo tensor.
+
+\note{The key narrative for PRIA: this is a \emph{decomposition} that exposes
+controllable knobs hidden inside the eigenvalue, not a new detector.}
+
+%==============================================================================
+\section{Equivalence to the Di~Zenzo tensor}
+\label{sec:equiv}
+
+The reduction rests on one identity. For any $u\in\mathbb{R}^2$ and unit
+$\Lvec$,
+\begin{equation}
+\label{eq:identity}
+(u\cdot\Lvec)^2 \;=\; \Lvec\transpose\,(u\,u\transpose)\,\Lvec .
+\end{equation}
+Summing \eqref{eq:identity} over the two gradient channels and setting
+$\alpha=0$ (so $h\equiv1$),
+\begin{equation}
+\label{eq:quadform}
+(\grad X\cdot\Lvec)^2 + (\grad Y\cdot\Lvec)^2
+=
+\Lvec\transpose
+\underbrace{\bigl[(\grad X)(\grad X)\transpose + (\grad Y)(\grad Y)\transpose\bigr]}_{\Mxy}
+\Lvec
+= \Lvec\transpose \Mxy\, \Lvec ,
+\end{equation}
+where $\Mxy$ is precisely the two-channel Di~Zenzo tensor
+\eqref{eq:dz-tensor}. Hence $E_{\Lvec}=\sqrt{\Lvec\transpose \Mxy\,\Lvec}$ is the
+directional component of the structure tensor. In the eigenbasis of $\Mxy$,
+with $\Lvec=(\cos\varphi,\sin\varphi)$,
+\begin{equation}
+\label{eq:radial}
+E_\varphi \;=\; \sqrt{\lmax\cos^2\varphi + \lmin\sin^2\varphi}.
+\end{equation}
+
+\begin{theorem}[Equivalence]
+\label{thm:equiv}
+Let $\bar E = \frac{1}{2\pi}\int_0^{2\pi} E_\varphi\,d\varphi$ be the
+angularly-averaged response \eqref{eq:radial}. Then
+\begin{equation}
+\label{eq:elliptic}
+\bar E \;=\; \frac{2}{\pi}\,\sqrt{\lmax}\;
+\mathrm{E}\!\left(\sqrt{1-\lmin/\lmax}\right),
+\end{equation}
+where $\mathrm{E}(\cdot)$ is the complete elliptic integral of the second
+kind. For fixed anisotropy ratio $\lmin/\lmax$, $\bar E$ is a strictly
+increasing function of $\sqrt{\lmax}$. Consequently any percentile threshold
+selects the same pixels from $\bar E$ as from the Di~Zenzo magnitude
+$\sqrt{\lmax}$; on rank-one edge structures ($\lmin=0$) the two binary edge
+maps are identical.
+\end{theorem}
+
+\begin{proof}
+\note{Draft --- formalize.}
+Equation~\eqref{eq:elliptic} follows from \eqref{eq:radial} by the
+substitution $k^2 = 1-\lmin/\lmax$ and the definition of $\mathrm{E}$.
+Strict monotonicity in $\sqrt{\lmax}$ at fixed $k$ is immediate since
+$\mathrm{E}(k)>0$. A strictly increasing transform preserves the order of
+pixel values, hence preserves every percentile threshold set; for
+$\lmin=0$, $\bar E=\frac{2}{\pi}\sqrt{\lmax}$ is exactly proportional to the
+Di~Zenzo magnitude. \qed
+\end{proof}
+
+\begin{proposition}[Direction-set redundancy]
+\label{prop:mode}
+Because the response depends on $\Lvec$ only through the quadratic form
+$\Lvec\transpose \Mxy\,\Lvec$, which is invariant under $\Lvec\mapsto-\Lvec$,
+augmenting a direction set $\{\Lvec_1,\Lvec_2\}$ with its antipodes
+$\{-\Lvec_1,-\Lvec_2\}$ leaves the averaged response unchanged. The
+corresponding configurations (``mode~1'' and ``mode~2'') produce
+pixel-identical maps.
+\end{proposition}
+
+\note{Empirically confirmed: \texttt{np.array\_equal} holds; see
+Table~\ref{tab:corr} and the orientation study.}
+
+%==============================================================================
+\section{The multiplicative extension and its limit on RGB-D}
+\label{sec:rgbd}
+
+The single algebraically distinct ingredient of \eqref{eq:vl-response} is the
+multiplicative height term $h(C_Z)$. With a fourth, semantically distinguished
+channel $D$ (depth) placed in the role of $Z$, one might expect channel-
+asymmetric modulation to help. We show the opposite, structurally.
+
+\begin{theorem}[Structural limit of multiplicative modulation]
+\label{thm:mult}
+Let the full response be $E_{\Lvec}^{\mathrm{full}} = h(C_Z)\,
+\sqrt{\Lvec\transpose \Mxy\,\Lvec}$ with $h$ bounded. If
+$\grad X = \grad Y = 0$ at a pixel, then $E_{\Lvec}^{\mathrm{full}} = 0$ there
+for every $\Lvec$, independently of $C_Z$ and $\grad C_Z$. Hence the operator
+cannot respond to an edge defined solely by the $Z$ channel (e.g.\ a depth
+step in a region of uniform color).
+\end{theorem}
+
+\begin{proof}
+$\Mxy = 0$ when $\grad X=\grad Y=0$, so $\sqrt{\Lvec\transpose \Mxy\,\Lvec}=0$
+and $h\cdot 0 = 0$ for any bounded $h$. \qed
+\end{proof}
+
+\begin{corollary}[Map of RGB-D generalizations]
+\label{cor:map}
+Any \emph{additive} incorporation of $D$, i.e.\ adding $(\grad D)(\grad D)
+\transpose$ to the tensor, yields $\sqrt{\Lvec\transpose M_{RGBD}\,\Lvec}$ and
+reduces by Theorem~\ref{thm:equiv} to multichannel Di~Zenzo. The only
+algebraically distinct, \emph{multiplicative} extension cannot detect
+$D$-only edges by Theorem~\ref{thm:mult}. Therefore, within this class, no
+generalization both differs from Di~Zenzo and detects depth-defined edges;
+doing so requires a mechanism nonlinear in $\grad D$.
+\end{corollary}
+
+%==============================================================================
+\section{Experiments}
+\label{sec:exp}
+
+\note{All numbers below are the actual measured outputs of the released code
+(\texttt{tests/}). Absolute timings are machine-dependent.}
+
+\paragraph{Synthetic set.}
+Table~\ref{tab:synth} reports F1 (2-pixel tolerance, $256\times256$).
+Sobel/Prewitt/Di~Zenzo are binarized at their $95$th percentile.
+
+\begin{table}[h]
+\centering
+\caption{Synthetic set, F1 at 2-pixel tolerance.}
+\label{tab:synth}
+\begin{tabular}{lcccc}
+\toprule
+Image & Sobel & Canny & DiZenzo & VL \\
+\midrule
+checkerboard                     & 0.000 & 0.945 & 0.739 & 0.933 \\
+concentric\_circles              & 1.000 & 1.000 & 1.000 & 1.000 \\
+color\_patches (equal bright.)   & 1.000 & 0.000 & 0.909 & 0.909 \\
+color\_wheel                     & 0.510 & 0.471 & 0.340 & 0.887 \\
+blurred\_disk                    & 1.000 & 1.000 & 1.000 & 1.000 \\
+gray\_scale                      & 1.000 & 1.000 & 0.000 & 0.000 \\
+\midrule
+\textbf{Mean}                    & 0.752 & 0.736 & 0.665 & 0.788 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Isoluminant orientation.}
+On equal-brightness color stripes at $12$ orientations, both color methods
+detect the edges (mean F1 $\approx 0.99$) while Canny scores $0.000$ at every
+orientation. \todo{Insert the per-orientation curve / figure
+(\texttt{orientation\_results.png}) or a compact summary table.}
+
+\paragraph{Real images: BSDS500.}
+Table~\ref{tab:bsds} reports the full $200$-image test split (union-of-
+annotators ground truth, tolerance $0.0075\times\text{diagonal}$, fixed
+thresholds; all detectors on the same images).
+
+\begin{table}[h]
+\centering
+\caption{BSDS500 test split (200 images). Fixed thresholds (no ODS/OIS tuning).}
+\label{tab:bsds}
+\begin{tabular}{lccc}
+\toprule
+Method & F1 & Precision & Recall \\
+\midrule
+DiZenzo        & \textbf{0.575} & \textbf{0.654} & 0.531 \\
+Canny          & 0.566 & 0.482 & \textbf{0.774} \\
+VL (default)   & 0.552 & 0.630 & 0.509 \\
+Prewitt        & 0.543 & 0.582 & 0.529 \\
+Sobel          & 0.541 & 0.577 & 0.530 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\note{All hand-crafted detectors sit far below modern learned methods
+(BSDS ODS $\approx 0.83$--$0.84$); cite for context, do not compete on F1.}
+
+\paragraph{Empirical equivalence.}
+Table~\ref{tab:corr} reports the rank correlation between the continuous
+response maps (Spearman $\rho$), confirming Theorem~\ref{thm:equiv}.
+
+\begin{table}[h]
+\centering
+\caption{Map correlation (Spearman $\rho$). VL$(\alpha{=}0)$ vs.\ Di~Zenzo, and
+the effect of the height term.}
+\label{tab:corr}
+\begin{tabular}{lcc}
+\toprule
+Image type & VL$(\alpha{=}0)\!\sim\!$DZ & VL$(\alpha{=}1)\!\sim\!$VL$(\alpha{=}0)$ \\
+\midrule
+Isoluminant patch        & 1.000 & 1.000 \\
+Isoluminant stripes 30$^\circ$ & 0.996 & 0.996 \\
+Real photos (BSDS, mean) & 0.99  & 0.97 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Controlled RGB-D.}
+Table~\ref{tab:rgbd} confirms Theorem~\ref{thm:mult}: VL-RGBD scores $0.000$ on
+the depth-only edge, and $\alpha{=}1$ is indistinguishable from $\alpha{=}0$,
+while a symmetric 4-channel Di~Zenzo handles every case.
+
+\begin{table}[h]
+\centering
+\caption{Controlled synthetic RGB-D, F1 at 2-pixel tolerance.}
+\label{tab:rgbd}
+\begin{tabular}{lcccc}
+\toprule
+Case & DZ-RGB & DZ-RGBD & VL-RGBD ($\alpha{=}1$) & VL-RGBD ($\alpha{=}0$) \\
+\midrule
+color edge, flat depth      & 0.769 & 0.769 & 0.667 & 0.667 \\
+\textbf{depth edge, flat color} & 0.000 & \textbf{0.769} & \textbf{0.000} & 0.000 \\
+coincident color+depth      & 0.769 & 0.769 & 0.667 & 0.667 \\
+orthogonal color/depth      & 0.722 & \textbf{0.910} & 0.636 & 0.636 \\
+\midrule
+\textbf{Mean}               & 0.565 & \textbf{0.790} & 0.490 & 0.490 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==============================================================================
+\section{Related work}
+\label{sec:related}
+\todo{Position against: Di~Zenzo and multichannel gradients; Cumani's
+multispectral edges; Sapiro's color/anisotropic work; the color structure
+tensor (van de Weijer et al.); learned edge detection (HED and successors)
+for context. Emphasize that the contribution is analytical (equivalence and
+limits), not a new top-scoring detector.}
+
+%==============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+\note{Draft --- expand.}
+We showed that an intuitive virtual-illumination color edge operator is, with
+its channel-asymmetric modulation disabled, a re-derivation of the Di~Zenzo
+structure tensor: the angularly-averaged response is a strictly monotone
+function of $\sqrt{\lmax}$, giving identical threshold-binarized edges. The
+only algebraically distinct ingredient, a multiplicative height term, is
+structurally unable to detect edges defined by the modulating channel alone,
+which closes the RGB-D direction within this class and leaves only nonlinear
+mechanisms open. The practical by-product is an open, reproducible toolkit of
+seven edge detectors and a benchmark.
+\todo{One sentence on the broader takeaway: re-derivations are valuable when
+their exact relationship to prior art is established and the boundary of the
+new degrees of freedom is characterized.}
+
+%==============================================================================
+\section*{Reproducibility}
+All code and data generators are released at
+\url{https://github.com/Nervni-Sanya/Edge-detection-benchmark}.
+The algebraic claims are mechanically reproduced by
+\texttt{tests/correspondence\_analysis.py} (Theorem~\ref{thm:equiv}) and
+\texttt{tests/rgbd\_synthetic\_test.py} (Theorem~\ref{thm:mult}); benchmark
+tables by \texttt{tests/testing.py}. See \texttt{docs/equivalence.md} for the
+full derivation.
+
+%==============================================================================
+\begin{thebibliography}{99}
+
+\bibitem{dizenzo1986}
+S.~Di~Zenzo,
+``A note on the gradient of a multi-image,''
+\emph{Computer Vision, Graphics, and Image Processing},
+vol.~33, no.~1, pp.~116--125, 1986.
+
+\bibitem{canny1986}
+J.~Canny,
+``A computational approach to edge detection,''
+\emph{IEEE Trans. Pattern Anal. Mach. Intell.},
+vol.~8, no.~6, pp.~679--698, 1986.
+
+\bibitem{cumani1991}
+A.~Cumani,
+``Edge detection in multispectral images,''
+\emph{CVGIP: Graphical Models and Image Processing},
+vol.~53, no.~1, pp.~40--51, 1991.
+
+\bibitem{sapiro1996}
+G.~Sapiro and D.~L.~Ringach,
+``Anisotropic diffusion of multivalued images with applications to color
+filtering,''
+\emph{IEEE Trans. Image Process.},
+vol.~5, no.~11, pp.~1582--1586, 1996.
+
+\bibitem{weijer2006}
+J.~van de Weijer, T.~Gevers, and A.~W.~M.~Smeulders,
+``Robust photometric invariant features from the color tensor,''
+\emph{IEEE Trans. Image Process.},
+vol.~15, no.~1, pp.~118--127, 2006.
+
+\bibitem{arbelaez2011}
+P.~Arbel\'aez, M.~Maire, C.~Fowlkes, and J.~Malik,
+``Contour detection and hierarchical image segmentation,''
+\emph{IEEE Trans. Pattern Anal. Mach. Intell.},
+vol.~33, no.~5, pp.~898--916, 2011.
+
+\bibitem{xie2015}
+S.~Xie and Z.~Tu,
+``Holistically-nested edge detection,''
+in \emph{Proc. IEEE Int. Conf. Computer Vision (ICCV)}, 2015, pp.~1395--1403.
+
+\bibitem{gonzalez2018}
+R.~C.~Gonzalez and R.~E.~Woods,
+\emph{Digital Image Processing}, 4th~ed.
+Pearson, 2018.
+
+% TODO: add a recent BSDS SOTA reference (e.g. EDTER / a 2024 baseline) for
+% the learned-methods context, and any additional color-edge references.
+
+\end{thebibliography}
+
+\end{document}
