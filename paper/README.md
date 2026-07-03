@@ -1,41 +1,65 @@
 # Paper draft
 
-`article.tex` — draft skeleton for **Pattern Recognition and Image Analysis (PRIA)**.
+Целевой журнал: **Pattern Recognition and Image Analysis** (PRIA, Pleiades Publishing).
 
-## Status
+| Файл | Статус | Назначение |
+|---|---|---|
+| `article_ru.tex` | **полный русский текст** (мастер-версия) | внутривузовская экспертиза + основа подачи |
+| `article.tex` | английский скелет (с `\todo`) | будет синхронизирован с финальной русской версией |
 
-- **Final** (carry the actual measured numbers): all theorems, equations, and
-  the five result tables (synthetic, BSDS500, correspondence, RGB-D).
-- **To be written by the author** (marked `\todo{...}` in red): abstract
-  headline, introduction motivation, related-work positioning, proof
-  formalizations, conclusion takeaway.
-- **Draft prose** (plain text, edit freely): section lead-ins.
+## article_ru.tex — что внутри
 
-The numbers were not invented — they are reproduced by the repository:
+Полный текст: аннотация, введение, теоремы 1–2 с доказательствами,
+предложения об избыточности направлений и перестановках, следствие-классификация
+обобщений на RGB-D, пять таблиц экспериментов, связанные работы, заключение,
+благодарности (с раскрытием использования ИИ), этика, библиография (10 источников).
 
-| Table | Source |
+Все числа — фактические результаты репозитория:
+
+| Таблица | Воспроизведение |
 |---|---|
-| Synthetic (Tab. 1) | `python tests/testing.py --baseline-only` |
-| Isoluminant (§6) | `python tests/testing.py --orientation` |
-| BSDS500, 200 img (Tab. 2) | `python tests/testing.py --bsds <BSDS500>` |
-| Correspondence (Tab. 3) | `python tests/correspondence_analysis.py` |
-| RGB-D (Tab. 4) | `python tests/rgbd_synthetic_test.py` |
+| Синтетика (табл. 1) | `python tests/testing.py --baseline-only` |
+| Ориентация (§6.2) | `python tests/testing.py --orientation` |
+| BSDS500, 200 изобр. (табл. 2) | `python tests/testing.py --bsds <BSDS500>` |
+| Корреляция (табл. 3) | `python tests/correspondence_analysis.py` |
+| RGB-D (табл. 4) | `python tests/rgbd_synthetic_test.py` |
 
-## Build
+## Сборка PDF
 
-Uses the standard `article` class so it compiles with any basic TeX install
-(it was **not** compile-tested in the authoring environment — no TeX toolchain
-there):
+Стандартный класс `article` + `babel(russian)`; собирается любым базовым
+дистрибутивом TeX (в среде подготовки TeX отсутствовал — сборка не
+проверялась, структура проверена программно):
 
 ```bash
-latexmk -pdf article.tex      # or: pdflatex article.tex (run twice for refs)
+latexmk -pdf article_ru.tex     # или pdflatex дважды
 ```
 
-## Before submission
+Без локального TeX проще всего: [Overleaf](https://www.overleaf.com) →
+New Project → Upload → `article_ru.tex` → Compile.
 
-1. Port the body into the PRIA / Pleiades template (`pleiades.cls` /
-   `spr-pria` style) — keep the math/tables, restyle the front matter.
-2. Confirm author block (co-authorship/order); no e-mail/ORCID embedded by
-   default, per the repository's privacy preference.
-3. Resolve all `\todo{}` markers; add the BSDS SOTA / extra color-edge
-   references flagged in the bibliography.
+## Чек-лист автора перед экспертизой / подачей
+
+1. **Вычитать весь текст и утвердить каждое утверждение** — текст готовил
+   ассистент на основе результатов репозитория; ответственность за
+   содержание несёт автор.
+2. **Соавторство**: решить, входит ли научный руководитель в авторы
+   (раскомментировать блок в `\author`) или остаётся в благодарностях.
+3. **Формулировка благодарностей** (включая абзац о использовании ИИ —
+   он соответствует издательской политике Springer/Pleiades, но текст
+   можно скорректировать).
+4. **Проверить выходные данные** источников, помеченных комментарием в
+   библиографии (EDTER; собственные тезисы `panchenko2026` — уточнить
+   точное название сборника и страницы).
+5. Собрать PDF и приложить к заявлению на экспертное заключение по форме вуза.
+
+## Примечания к подаче в PRIA
+
+- Журнал издаётся на английском (Pleiades). Уточните в актуальных правилах
+  для авторов, принимается ли рукопись на русском с последующим переводом
+  издательством, либо требуется английская версия — во втором случае
+  английский текст будет синхронизирован с финализированной русской версией
+  (`article.tex` уже содержит весь математический каркас).
+- Перед подачей перенести текст в актуальный шаблон издательства, если он
+  требуется правилами.
+- Тип статьи: аналитическая / математические методы распознавания — без
+  претензии на SOTA, вклад теоретический + воспроизводимый бенчмарк.
