@@ -60,3 +60,6 @@ docs/_build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Paper build intermediates
+paper/eq_png/
