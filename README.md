@@ -82,6 +82,27 @@ On real photos Di Zenzo leads `vector_lighting` (0.575 vs 0.552). All hand-craft
 | VectorLight(α=0) ↔ DiZenzo | **0.99–1.00** | Rank-identical ⇒ the same operator |
 | height term (α=1 vs α=0) | ~0.98 | Adds only a ~2–3% perturbation |
 
+### Runtime — read the caveats before quoting these
+
+`python tests/timing_robust.py` (256×256, 3 content types, 7 interleaved rounds):
+
+| Detector | Median | vs. fair Sobel |
+|---|:--:|:--:|
+| Sobel / Prewitt (separable, `ndimage`) | 2.6 ms | 1.0× |
+| Sobel / Prewitt (`correlate2d`, **this repo**) | 5.6 ms | 2.2× slower |
+| VL, 2 vectors, σ=0 | 5.9 ms | 2.3× slower |
+| VL, 8 vectors, σ=0 | 8.8 ms | 3.4× slower |
+| Canny (this repo) | 15.4 ms | 6.0× slower |
+| Di Zenzo | 25.9 ms | 10.1× slower |
+| VL default (8 vectors + permutations) | 38.7 ms | 15.1× slower |
+
+Two caveats that earlier versions of this README got wrong:
+
+1. **The repo's Sobel/Prewitt are an unfairly slow baseline.** They use `scipy.signal.correlate2d` (general 2D correlation), 2.2× slower than the separable `ndimage` equivalent. Low-vector-count `vector_lighting` looks like it "matches Sobel" only against that slow implementation; against a fair Sobel it is **2.3× slower**.
+2. **Dropping light vectors buys much less than it appears.** Runtime is linear with a dominant fixed cost — `T(N) ≈ 8.3 ms + 0.47 ms · N` — so fixed work (gradients, percentile, normalization) is 69% of the total at N=8. Going 8 → 2 vectors gives ~1.5×, and no vector-count reduction can exceed ~1.45×.
+
+Naive block-wise timing (all repetitions of A, then all of B) is unreliable here: identical calls measured **8.0 ms cold vs 4.0 ms after allocation churn**, a 2× swing that exceeds most differences above. `tests/timing_robust.py` interleaves detectors and shuffles order to remove it; `tests/timing_scaling_analysis.py` breaks down the cost.
+
 ## Library usage
 
 All seven detectors share a simple `(H, W, 3) uint8 → (H, W) uint8` signature:
@@ -107,7 +128,7 @@ e_mcs     = multichannel_sobel(img, sigma=1.0)
 e_vl      = vector_lighting(img, mode=3, sigma=1.0)
 ```
 
-For a standard, well-understood color edge detector, prefer the Di Zenzo structure tensor — it's faster, slightly more accurate on real photos (BSDS500), and the documented baseline in the literature.
+For a standard, well-understood color edge detector, prefer the Di Zenzo structure tensor — it is ~1.5× faster than `vector_lighting`'s default configuration (though slower than its 2-vector setting), slightly more accurate on real photos (BSDS500), and the documented baseline in the literature.
 
 ## Reproduce
 
