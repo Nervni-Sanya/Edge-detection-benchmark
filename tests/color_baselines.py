@@ -25,13 +25,14 @@
 Computer Vision, Graphics, and Image Processing, 33(1):116–125, 1986.
 """
 
+import os
+import sys
 from typing import Tuple
 import numpy as np
 from scipy.ndimage import gaussian_filter, binary_dilation
-from scipy.signal import correlate2d
 
-_SOBEL_X = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=float)
-_SOBEL_Y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=float)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from vector_lighting.core import _separable_gradients, _SMOOTH_SOBEL  # noqa: E402
 
 
 def _normalize_u8(arr: np.ndarray) -> np.ndarray:
@@ -42,17 +43,24 @@ def _normalize_u8(arr: np.ndarray) -> np.ndarray:
 
 
 def _channel_gradients(image: np.ndarray, sigma: float) -> Tuple[np.ndarray, np.ndarray]:
-    """Поканальные градиенты по x и y. Возвращает массивы (H, W, C)."""
+    """Поканальные градиенты по x и y. Возвращает массивы (H, W, C).
+
+    Используются сепарабельные одномерные корреляции (см. комментарий в
+    vector_lighting/core.py): результат тождественен двумерной корреляции
+    с ядром Собеля, но вычисляется быстрее. Это важно для корректности
+    сравнения по времени: все операторы репозитория должны использовать
+    одинаково эффективную реализацию свёртки.
+    """
     if image.ndim == 2:
         image = image[..., None]
     chans = image.astype(float)
     if sigma > 0:
         chans = np.stack([gaussian_filter(chans[..., k], sigma=sigma)
                           for k in range(chans.shape[2])], axis=-1)
-    gx = np.stack([correlate2d(chans[..., k], _SOBEL_X, mode='same', boundary='symm')
-                   for k in range(chans.shape[2])], axis=-1)
-    gy = np.stack([correlate2d(chans[..., k], _SOBEL_Y, mode='same', boundary='symm')
-                   for k in range(chans.shape[2])], axis=-1)
+    grads = [_separable_gradients(chans[..., k], _SMOOTH_SOBEL)
+             for k in range(chans.shape[2])]
+    gx = np.stack([g[0] for g in grads], axis=-1)
+    gy = np.stack([g[1] for g in grads], axis=-1)
     return gx, gy
 
 

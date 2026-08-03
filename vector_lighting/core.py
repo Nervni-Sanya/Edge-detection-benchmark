@@ -10,11 +10,30 @@ Vector Lighting Edge Detector Library
 from typing import List, Tuple, Optional, Literal, Union
 from itertools import permutations
 import numpy as np
-from scipy.ndimage import gaussian_filter, binary_opening, binary_dilation
-from scipy.signal import correlate2d
+from scipy.ndimage import (gaussian_filter, binary_opening, binary_dilation,
+                           correlate1d)
 
 __version__ = "1.0.0"
 __author__ = "Панченко Александр Алексеевич"
+
+# Ядра Собеля и Превитта сепарабельны: K = smooth^T ⊗ diff, где diff = [-1, 0, 1],
+# а smooth равно [1, 2, 1] для Собеля и [1, 1, 1] для Превитта. Две одномерные
+# корреляции дают тот же результат, что и одна двумерная (совпадение проверено
+# с точностью до округления float64, ~1e-13), но выполняются заметно быстрее:
+# двумерная корреляция общего вида не использует сепарабельность ядра.
+_DIFF = np.array([-1.0, 0.0, 1.0])
+_SMOOTH_SOBEL = np.array([1.0, 2.0, 1.0])
+_SMOOTH_PREWITT = np.array([1.0, 1.0, 1.0])
+
+
+def _separable_gradients(channel: np.ndarray, smooth: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Градиенты по x и y сепарабельным ядром (mode='reflect' эквивалентен
+    boundary='symm' двумерной корреляции)."""
+    gx = correlate1d(correlate1d(channel, _DIFF, axis=1, mode='reflect'),
+                     smooth, axis=0, mode='reflect')
+    gy = correlate1d(correlate1d(channel, _DIFF, axis=0, mode='reflect'),
+                     smooth, axis=1, mode='reflect')
+    return gx, gy
 
 
 def _normalize_image(image: np.ndarray, target_range: Tuple[float, float] = (0, 255)) -> np.ndarray:
@@ -46,10 +65,7 @@ def sobel(image: np.ndarray) -> np.ndarray:
         Магнитуда градиента (uint8).
     """
     gray = _rgb_to_grayscale(image)
-    sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=float)
-    sobel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=float)
-    gx = correlate2d(gray, sobel_x, mode='same', boundary='symm')
-    gy = correlate2d(gray, sobel_y, mode='same', boundary='symm')
+    gx, gy = _separable_gradients(gray, _SMOOTH_SOBEL)
     magnitude = np.sqrt(gx**2 + gy**2)
     if magnitude.max() > 0:
         magnitude = _normalize_image(magnitude, (0, 255))
@@ -70,10 +86,7 @@ def prewitt(image: np.ndarray) -> np.ndarray:
         Магнитуда градиента (uint8).
     """
     gray = _rgb_to_grayscale(image)
-    prewitt_x = np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]], dtype=float)
-    prewitt_y = np.array([[-1, -1, -1], [0, 0, 0], [1, 1, 1]], dtype=float)
-    gx = correlate2d(gray, prewitt_x, mode='same', boundary='symm')
-    gy = correlate2d(gray, prewitt_y, mode='same', boundary='symm')
+    gx, gy = _separable_gradients(gray, _SMOOTH_PREWITT)
     magnitude = np.sqrt(gx**2 + gy**2)
     if magnitude.max() > 0:
         magnitude = _normalize_image(magnitude, (0, 255))
@@ -99,12 +112,9 @@ def canny(image: np.ndarray, low_threshold: float = 50, high_threshold: float = 
     """
     gray = _rgb_to_grayscale(image)
     smoothed = gaussian_filter(gray, sigma=sigma)
-    
-    sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=float)
-    sobel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=float)
-    gx = correlate2d(smoothed, sobel_x, mode='same', boundary='symm')
-    gy = correlate2d(smoothed, sobel_y, mode='same', boundary='symm')
-    
+
+    gx, gy = _separable_gradients(smoothed, _SMOOTH_SOBEL)
+
     magnitude = np.sqrt(gx**2 + gy**2)
     direction = np.arctan2(gy, gx)
     

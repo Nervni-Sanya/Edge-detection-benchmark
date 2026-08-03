@@ -8,10 +8,10 @@ else:
     long_description = ""
 
 setup(
-    name="vector-lighting-edges",
+    name="edge-detection-benchmark",
     version="1.0.0",
     author="Панченко Александр Алексеевич",
-    description="Edge detection using vector lighting method for RGB images",
+    description="Edge detection toolkit and reproducible benchmark: grayscale (Sobel, Prewitt, Canny) and color (Di Zenzo, vector lighting) operators",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Nervni-Sanya/Edge-detection-benchmark",
@@ -39,5 +39,5 @@ setup(
         "dev": ["pytest", "black", "flake8"],
         "examples": ["pillow", "matplotlib"],
     },
-    keywords="edge detection, image processing, vector lighting, computer vision",
+    keywords="edge detection, image processing, structure tensor, Di Zenzo, color, benchmark, computer vision",
 )

@@ -38,7 +38,31 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from vector_lighting import vector_lighting, sobel, prewitt, canny   # noqa: E402
 from vector_lighting.core import _rgb_to_grayscale                    # noqa: E402
-from color_baselines import dizenzo                                   # noqa: E402
+from color_baselines import dizenzo, _normalize_u8                    # noqa: E402
+
+
+def dizenzo_matched(image: np.ndarray, sigma: float = 0.0) -> np.ndarray:
+    """Di Zenzo в конфигурации, согласованной с быстрыми пресетами
+    vector_lighting: без гауссова сглаживания и с центральными разностями
+    (np.gradient) вместо градиентов Собеля.
+
+    Нужен для честного сравнения: стандартный Di Zenzo использует
+    сглаживание и градиенты Собеля, поэтому «выигрыш» быстрых пресетов
+    vector_lighting над ним отражает разницу конфигураций, а не операторов.
+    """
+    ch = [image[:, :, k].astype(float) for k in range(image.shape[2])]
+    if sigma > 0:
+        from scipy.ndimage import gaussian_filter
+        ch = [gaussian_filter(c, sigma) for c in ch]
+    grads = [np.gradient(c) for c in ch]
+    gx = [g[1] for g in grads]
+    gy = [g[0] for g in grads]
+    E = sum(a * a for a in gx)
+    F = sum(a * b for a, b in zip(gx, gy))
+    G = sum(a * a for a in gy)
+    tmp = np.sqrt(np.maximum((E - G) ** 2 + 4.0 * F * F, 0.0))
+    mag = _normalize_u8(np.sqrt(np.maximum(0.5 * (E + G + tmp), 0.0)))
+    return (mag > np.mean(mag)).astype(np.uint8) * 255
 
 
 # --------------------------------------------------------------------------
@@ -131,7 +155,8 @@ def main():
         'Prewitt (correlate2d)':            prewitt,
         'Prewitt (сепарабельный)':          prewitt_fast,
         'Canny (репозиторий)':              canny,
-        'Di Zenzo':                         dizenzo,
+        'Di Zenzo (Собель + sigma=1)':      dizenzo,
+        'Di Zenzo (согласованная конфиг.)': dizenzo_matched,
         'VL mode=1 (2 вектора, sigma=0)':
             lambda i: vector_lighting(i, mode=1, sigma=0.0,
                                       binary_percentile=0.0, use_permutations=False),
@@ -158,15 +183,24 @@ def main():
 
     print()
     print("Ключевые соотношения:")
-    s_slow = res['Sobel (correlate2d, репозиторий)'][0]
     s_fast = res['Sobel (сепарабельный, ndimage)'][0]
     v1 = res['VL mode=1 (2 вектора, sigma=0)'][0]
     v3 = res['VL mode=3 (8 векторов, sigma=0)'][0]
-    print(f"  correlate2d медленнее сепарабельной реализации:      {s_slow/s_fast:5.1f}x")
+    dz_std = res['Di Zenzo (Собель + sigma=1)'][0]
+    dz_m = res['Di Zenzo (согласованная конфиг.)'][0]
     print(f"  VL(8 векторов) медленнее VL(2 векторов):             {v3/v1:5.2f}x "
           f"(при линейном масштабировании ожидалось бы 4x)")
     print(f"  VL(2 вектора) относительно честного Собеля:          {v1/s_fast:5.1f}x медленнее")
-    print(f"  VL(2 вектора) относительно Собеля из репозитория:    {v1/s_slow:5.2f}x")
+    print(f"  VL(2 вектора) против Di Zenzo в СТАНДАРТНОЙ конфиг.: "
+          f"{dz_std/v1:5.2f}x в пользу VL")
+    print(f"  VL(2 вектора) против Di Zenzo в СОГЛАСОВАННОЙ конфиг.: "
+          f"{v1/dz_m:5.2f}x в пользу Di Zenzo")
+    print()
+    print("  Вывод: преимущество быстрых пресетов над Di Zenzo существует только")
+    print("  при сравнении с его стандартной конфигурацией (сглаживание + Собель).")
+    print("  При одинаковой конфигурации тензорная форма быстрее: она вычисляет")
+    print("  ту же величину в замкнутом виде, тогда как виртуальное освещение")
+    print("  восстанавливает её выборкой по N направлениям.")
 
 
 if __name__ == '__main__':

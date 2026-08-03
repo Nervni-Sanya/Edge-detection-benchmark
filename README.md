@@ -15,7 +15,7 @@ A small Python edge-detection toolkit and reproducible benchmark. The package sh
 > - Its one distinctive ingredient, a channel-asymmetric *height* term, perturbs the result by only ~2–3% and **does not improve** general-RGB accuracy (on BSDS500 it slightly lowers it).
 > - The genuine "color sensitivity" advantage over grayscale Canny is **real but not unique** — Di Zenzo shares it.
 >
-> So `vector_lighting` is **not** a superior new detector. This repository is therefore best understood as a **benchmark and an independent re-derivation**, not a novelty claim. The algebraic proof of equivalence is in [`docs/equivalence.md`](docs/equivalence.md); empirical verification is reproducible with `python tests/correspondence_analysis.py`; the extended benchmark report is in [`docs/benchmark_report_2026-06.md`](docs/benchmark_report_2026-06.md).
+> So `vector_lighting` is **not** a superior new detector. This repository is therefore best understood as a **benchmark and an independent re-derivation**, not a novelty claim. The algebraic proof of equivalence is in [`docs/equivalence.md`](docs/equivalence.md); empirical verification is reproducible with `python tests/correspondence_analysis.py`.
 
 ## Author
 
@@ -35,19 +35,30 @@ All numbers below are reproducible. Absolute timings are machine-dependent.
 
 ### Synthetic set (F1, 2-px tolerance, 256×256)
 
-`python tests/testing.py --baseline-only`. Sobel/Prewitt/Di Zenzo are binarized at their 95th percentile; single-image synthetic F1 is sensitive to that choice.
+> ⚠️ **These numbers are not a reliable ranking.** See the tie warning below the table.
+
+`python tests/testing.py --baseline-only`. Sobel/Prewitt/Di Zenzo are binarized at their 95th percentile.
 
 | Image | Sobel | Canny | DiZenzo | VectorLight |
 |-------|:-----:|:-----:|:-------:|:-----------:|
-| `checkerboard` | 0.000 | 0.945 | 0.739 | 0.933 |
+| `checkerboard` | 0.000 | 0.958 | 0.505 | 0.933 |
 | `concentric_circles` | 1.000 | 1.000 | 1.000 | 1.000 |
 | `color_patches_equal_brightness` | 1.000 | 0.000 | 0.909 | 0.909 |
-| `color_wheel` | 0.510 | 0.471 | 0.340 | 0.887 |
+| `color_wheel` | 0.510 | 0.473 | 0.340 | 0.887 |
 | `blurred_disk` | 1.000 | 1.000 | 1.000 | 1.000 |
 | `gray_scale` | 1.000 | 1.000 | 0.000 | 0.000 |
-| **Mean F1** | 0.752 | 0.736 | 0.665 | 0.788 |
+| **Mean F1** | 0.752 | 0.739 | 0.626 | 0.788 |
 
-On this tiny synthetic set `vector_lighting` and Di Zenzo trade wins per image (the two are the same underlying operator, so per-image gaps come from threshold brittleness, not a real quality difference). The decisive comparison is on real images below.
+**Why these are unreliable: threshold ties.** Synthetic images contain large areas of identical gradient magnitude, so thousands of pixels land *exactly* on the percentile threshold and are all included or excluded together. Switching the comparison from `>` to `>=` — a tie-breaking choice with no physical meaning — moves F1 by up to **0.45**:
+
+| Image | Pixels exactly at threshold | F1 with `>` | F1 with `>=` |
+|---|:--:|:--:|:--:|
+| `checkerboard` | 4690 (28.6%) | 0.505 | **0.954** |
+| `color_patches_equal_brightness` | 992 | 0.909 | 0.772 |
+| `color_wheel` | 527 | 0.340 | 0.469 |
+| Real photo (BSDS500) | 173 (0.11%) | — | negligible |
+
+The same sensitivity makes these numbers change under floating-point rounding at the 1e-16 level. **Draw conclusions from the real-image results below**, where ties are 0.11% of pixels and the numbers are stable.
 
 ### Color sensitivity (isoluminant edges) — the advantage is shared
 
@@ -82,26 +93,43 @@ On real photos Di Zenzo leads `vector_lighting` (0.575 vs 0.552). All hand-craft
 | VectorLight(α=0) ↔ DiZenzo | **0.99–1.00** | Rank-identical ⇒ the same operator |
 | height term (α=1 vs α=0) | ~0.98 | Adds only a ~2–3% perturbation |
 
-### Runtime — read the caveats before quoting these
+### Runtime — configuration, not operator, drives the differences
 
-`python tests/timing_robust.py` (256×256, 3 content types, 7 interleaved rounds):
+All operators now use separable convolutions (`ndimage.correlate1d`), which is mathematically identical to the 2D form (agreement to ~1e-13) but roughly twice as fast. `python tests/timing_robust.py` (256×256, 3 content types, 7 interleaved rounds):
 
-| Detector | Median | vs. fair Sobel |
+| Detector | Median | vs. Sobel |
 |---|:--:|:--:|
-| Sobel / Prewitt (separable, `ndimage`) | 2.6 ms | 1.0× |
-| Sobel / Prewitt (`correlate2d`, **this repo**) | 5.6 ms | 2.2× slower |
-| VL, 2 vectors, σ=0 | 5.9 ms | 2.3× slower |
-| VL, 8 vectors, σ=0 | 8.8 ms | 3.4× slower |
-| Canny (this repo) | 15.4 ms | 6.0× slower |
-| Di Zenzo | 25.9 ms | 10.1× slower |
-| VL default (8 vectors + permutations) | 38.7 ms | 15.1× slower |
+| Sobel / Prewitt | 2.6 ms | 1.0× |
+| Di Zenzo, **matched config** (σ=0, central differences) | 4.9 ms | 1.9× |
+| VL, 2 vectors, σ=0 | 5.8 ms | 2.3× |
+| VL, 8 vectors, σ=0 | 8.5 ms | 3.3× |
+| Canny | 11.5 ms | 4.5× |
+| Di Zenzo, standard (Sobel gradients + σ=1) | 16.4 ms | 6.4× |
+| VL default (8 vectors + permutations) | 36.7 ms | 14.4× |
 
-Two caveats that earlier versions of this README got wrong:
+**`vector_lighting` is not faster than Di Zenzo at equal settings.** Comparing VL's fast preset against Di Zenzo's *standard* configuration suggests a 2.8× advantage, but that gap is the configuration (Gaussian pre-smoothing + Sobel gradients vs. neither), not the operator. Give Di Zenzo the same cheap settings and it wins on **both** axes at once — 1.17× faster *and* markedly more accurate (mean F1 0.908 vs 0.703 on the synthetic set).
 
-1. **The repo's Sobel/Prewitt are an unfairly slow baseline.** They use `scipy.signal.correlate2d` (general 2D correlation), 2.2× slower than the separable `ndimage` equivalent. Low-vector-count `vector_lighting` looks like it "matches Sobel" only against that slow implementation; against a fair Sobel it is **2.3× slower**.
-2. **Dropping light vectors buys much less than it appears.** Runtime is linear with a dominant fixed cost — `T(N) ≈ 8.3 ms + 0.47 ms · N` — so fixed work (gradients, percentile, normalization) is 69% of the total at N=8. Going 8 → 2 vectors gives ~1.5×, and no vector-count reduction can exceed ~1.45×.
+This follows from the [equivalence proof](docs/equivalence.md): both compute the same quantity, but the tensor obtains it in closed form while virtual illumination reconstructs it by sampling N directions. Sampling a closed-form expression cannot be cheaper than evaluating it.
 
-Naive block-wise timing (all repetitions of A, then all of B) is unreliable here: identical calls measured **8.0 ms cold vs 4.0 ms after allocation churn**, a 2× swing that exceeds most differences above. `tests/timing_robust.py` interleaves detectors and shuffles order to remove it; `tests/timing_scaling_analysis.py` breaks down the cost.
+Two further measurement notes:
+
+1. **Dropping light vectors buys little.** Runtime is linear with a dominant fixed cost — `T(N) ≈ 8.3 ms + 0.47 ms · N` — so fixed work (gradients, percentile, normalization) is 69% of the total at N=8. Going 8 → 2 vectors gives ~1.5×, and no vector-count reduction can exceed ~1.45×.
+2. **Naive block-wise timing is unreliable** (all repetitions of A, then all of B): identical calls measured **8.0 ms cold vs 4.0 ms after allocation churn**, a 2× swing exceeding most differences above. `tests/timing_robust.py` interleaves detectors and shuffles order to remove it; `tests/timing_scaling_analysis.py` breaks down the cost.
+
+### Image size (256 → 2048)
+
+`python tests/testing.py --scaling`. Median ms (left) and mean F1 (right), 3 patterns per size:
+
+| Detector | 256 | 512 | 1024 | 2048 | | F1@256 | F1@512 | F1@1024 | F1@2048 |
+|---|---:|---:|---:|---:|---|:--:|:--:|:--:|:--:|
+| Sobel | 2.9 | 12.6 | 59 | 396 | | 0.667 | 0.667 | 0.989 | 0.989 |
+| Prewitt | 2.9 | 12.3 | 59 | 393 | | 0.667 | 0.667 | 0.989 | 0.989 |
+| Canny | 11.9 | 49 | 207 | 1697 | | 0.653 | 0.652 | 0.652 | 0.652 |
+| VL-turbo | 5.3 | 24 | 140 | 823 | | **0.990** | **0.989** | **0.989** | **0.989** |
+| VL-fast | 7.5 | 32 | 171 | 1042 | | 0.945 | 0.945 | 0.927 | 0.901 |
+| VL-default | 35.9 | 168 | 1056 | 9753 | | 0.947 | 0.859 | 0.759 | 0.710 |
+
+The default configuration's F1 **degrades with size** (0.947 → 0.710) while VL-turbo stays flat. This is parameter calibration, not the operator: `sigma=1.0` blurs a fixed pixel width regardless of resolution, and `binary_percentile=0.05` keeps a fixed 5% of pixels while the true edge fraction falls as ~1/size. **For images above ~512 px use `sigma=0–0.5` and `binary_percentile=0.0`.**
 
 ## Library usage
 

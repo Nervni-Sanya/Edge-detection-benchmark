@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "Vector Lighting Edge Detector"
-abstract: "Библиотека для выделения границ на цветных изображениях методом векторного освещения. Содержит классические методы (Sobel, Prewitt, Canny) и авторский метод vector_lighting."
+title: "Edge Detection Benchmark: grayscale and color operators with a reproducible evaluation"
+abstract: "Инструментарий выделения границ и воспроизводимый бенчмарк: полутоновые операторы (Sobel, Prewitt, Canny), цветовые (структурный тензор Ди Дзензо и варианты) и оператор виртуального освещения vector_lighting, эквивалентность которого тензору Ди Дзензо доказана в docs/equivalence.md."
 authors:
   - family-names: "Панченко"
     given-names: "Александр Алексеевич"
@@ -13,7 +13,8 @@ license: "MIT"
 keywords:
   - "edge detection"
   - "image processing"
-  - "vector lighting"
+  - "structure tensor"
+  - "Di Zenzo"
   - "computer vision"
   - "Python"
 type: software
